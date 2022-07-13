@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/golang-upgradeskill/pkg/models"
 )
@@ -26,23 +27,27 @@ func (u *users) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	} else if r.Method == http.MethodPost {
 		u.addUser(rw, r)
 		return
-	}
-
-	if r.Method == http.MethodPut {
-		// Expect the ID in URI.
-		// r := regexp.MustCompile(`/([0-9]+)`)
-		// g := r.FindAllStringSubmatch(r.URL.Path, -1)
-		u.l.Println("The request is ", r.Method)
-		t := r.URL.Path
-
-		if len(t) == 1 {
-			u.l.Println("Invalid ID")
+	} else {
+		// Request has an ID, as in "/task/<id>".
+		path := strings.Trim(r.URL.Path, "/")
+		pathParts := strings.Split(path, "/")
+		if len(pathParts) < 2 {
+			http.Error(rw, "expect /<id> in user handler", http.StatusBadRequest)
 			return
 		}
-		id, _ := strconv.Atoi(string(t[1:]))
-
-		u.l.Println("The id is ", id)
-		u.updateUser(id, rw, r)
+		id, err := strconv.Atoi(pathParts[1])
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if r.Method == http.MethodPut {
+			u.updateUser(int(id), rw, r)
+		} else if r.Method == http.MethodGet {
+			u.getUser(rw, r)
+		} else {
+			http.Error(rw, fmt.Sprintf("expect method GET or DELETE at /task/<id>, got %v", req.Method), http.StatusMethodNotAllowed)
+			return
+		}
 	}
 
 	// Handle UPDATE
@@ -53,7 +58,7 @@ func (u *users) getUser(rw http.ResponseWriter, r *http.Request) {
 
 	lp := models.GetUsers()
 
-	// This converts the lp object into json format and calls he Write method of rw.
+	// This converts the lp object into json format andaa calls he Write method of rw.
 	err2 := json.NewEncoder(rw).Encode(lp)
 
 	if err2 != nil {
